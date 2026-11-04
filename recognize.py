@@ -49,11 +49,12 @@ def open_image(image_path):
 VALLEY = 0.5
 
 
-def preprocess(image):
+def preprocess(image, gentle=False):
     """Grayscale, flatten uneven lighting, and normalize contrast.
 
     Dividing by a heavily blurred copy removes shadows and vignetting; a
-    percentile stretch then maps paper to white and ink to dark.
+    percentile stretch then maps paper to white and ink to dark. Gentle mode
+    clips fewer pixels and applies a gamma curve to keep faint strokes visible.
     """
     gray = image.convert("L")
     gray_f = np.asarray(gray, dtype=np.float32)
@@ -62,10 +63,16 @@ def preprocess(image):
     background = np.asarray(gray.filter(ImageFilter.GaussianBlur(radius)), dtype=np.float32)
     flat = np.clip(gray_f / np.maximum(background, 1.0), 0, 1.2)
 
-    low, high = np.percentile(flat, 1), np.percentile(flat, 99)
+    if gentle:
+        # After flattening, paper sits at ~1.0; keep it white and clip only extreme ink
+        low, high = np.percentile(flat, 0.1), 1.0
+    else:
+        low, high = np.percentile(flat, 1), np.percentile(flat, 99)
     if high - low < 1e-3:
         return image
     norm = np.clip((flat - low) / (high - low), 0, 1)
+    if gentle:
+        norm = norm ** 2  # darken mid-tones so pale ink stays distinct from paper
     return Image.fromarray((norm * 255).astype(np.uint8)).convert("RGB")
 
 
@@ -169,6 +176,16 @@ def main():
         action="store_true",
         help="skip grayscale/lighting/contrast preprocessing",
     )
+    parser.add_argument(
+        "--gentle",
+        action="store_true",
+        help="milder contrast stretch that preserves faint strokes",
+    )
+    parser.add_argument(
+        "--save-preprocessed",
+        action="store_true",
+        help="save the preprocessed image next to the input for inspection",
+    )
     args = parser.parse_args()
     processor, model = load_model()
 
@@ -180,7 +197,11 @@ def main():
             continue
 
         if not args.raw:
-            image = preprocess(image)
+            image = preprocess(image, gentle=args.gentle)
+            if args.save_preprocessed:
+                out = Path(image_path).with_name(Path(image_path).stem + "_preprocessed.png")
+                image.save(out)
+                print(f"Saved {out}")
         crops = split_lines(image) if args.lines else [image]
         print(f"\n{image_path}:")
         for crop in crops:
