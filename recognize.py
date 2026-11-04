@@ -1,4 +1,5 @@
 
+import sys
 from pathlib import Path
 
 import torch
@@ -9,7 +10,7 @@ from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 MODEL_NAME = "microsoft/trocr-base-handwritten"
 
 # Input image containing handwritten text
-IMAGE_PATH = Path("handwriting.png")
+DEFAULT_IMAGE = "handwriting.png"
 
 # Select GPU if available, otherwise CPU
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -65,22 +66,15 @@ def recognize_text(image_path, processor, model):
 
 
 def main():
+    image_paths = sys.argv[1:] or [DEFAULT_IMAGE]
     processor, model = load_model()
 
-    try:
-        text = recognize_text(
-            IMAGE_PATH,
-            processor,
-            model
-        )
-
-        print("\nRecognized text:")
-        print("-" * 40)
-        print(text)
-        print("-" * 40)
-
-    except FileNotFoundError as error:
-        print(f"Error: {error}")
+    for image_path in image_paths:
+        try:
+            text = recognize_text(image_path, processor, model)
+            print(f"\n{image_path}: {text}")
+        except FileNotFoundError as error:
+            print(f"Error: {error}")
 
 
 if __name__ == "__main__":
