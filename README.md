@@ -23,7 +23,7 @@ Splits are made by form (90/10/10-style random split, seed 42), so no page appea
 
 | Script | Purpose |
 |---|---|
-| `recognize.py` | Inference with pretrained TrOCR on `handwriting.png` |
+| `recognize.py` | Pretrained TrOCR inference; `--lines` splits multi-line pages |
 | `train_crnn.py` | Train a CNN + BiLSTM + CTC model from scratch |
 | `predict_crnn.py` | Run a trained CRNN checkpoint on one image |
 | `finetune_trocr.py` | Fine-tune `microsoft/trocr-base-handwritten` on IAM |
@@ -37,3 +37,11 @@ python finetune_trocr.py --iam-root /path/to/iam --epochs 3
 
 Both trainers report validation/test character and word error rates (CER/WER).
 A GPU is strongly recommended; TrOCR fine-tuning needs roughly 8+ GB of VRAM at batch size 4.
+
+## Multi-line pages
+
+```bash
+python recognize.py page.png --lines
+```
+
+Lines are found by horizontal gaps between ink, so use straight, plain-paper pages.
