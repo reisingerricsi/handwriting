@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from PIL import Image
+from PIL import Image, ImageFilter
 from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 
 # Pretrained model from Hugging Face
@@ -47,6 +47,26 @@ def open_image(image_path):
 
 
 VALLEY = 0.5
+
+
+def preprocess(image):
+    """Grayscale, flatten uneven lighting, and normalize contrast.
+
+    Dividing by a heavily blurred copy removes shadows and vignetting; a
+    percentile stretch then maps paper to white and ink to dark.
+    """
+    gray = image.convert("L")
+    gray_f = np.asarray(gray, dtype=np.float32)
+
+    radius = max(gray.size) / 20
+    background = np.asarray(gray.filter(ImageFilter.GaussianBlur(radius)), dtype=np.float32)
+    flat = np.clip(gray_f / np.maximum(background, 1.0), 0, 1.2)
+
+    low, high = np.percentile(flat, 1), np.percentile(flat, 99)
+    if high - low < 1e-3:
+        return image
+    norm = np.clip((flat - low) / (high - low), 0, 1)
+    return Image.fromarray((norm * 255).astype(np.uint8)).convert("RGB")
 
 
 def split_lines(image, margin=4):
@@ -144,6 +164,11 @@ def main():
         action="store_true",
         help="split each image into text lines and recognize every line",
     )
+    parser.add_argument(
+        "--raw",
+        action="store_true",
+        help="skip grayscale/lighting/contrast preprocessing",
+    )
     args = parser.parse_args()
     processor, model = load_model()
 
@@ -154,6 +179,8 @@ def main():
             print(f"Error: {error}")
             continue
 
+        if not args.raw:
+            image = preprocess(image)
         crops = split_lines(image) if args.lines else [image]
         print(f"\n{image_path}:")
         for crop in crops:
