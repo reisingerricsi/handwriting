@@ -45,3 +45,7 @@ python recognize.py page.png --lines
 ```
 
 Lines are found by horizontal gaps between ink, so use straight, plain-paper pages.
+
+Images are converted to grayscale, lighting is flattened and contrast normalized before recognition. Use `--raw` to skip this.
+
+If faint strokes get lost, add `--gentle`. Use `--save-preprocessed` to write `<name>_preprocessed.png` next to the input and inspect it.
